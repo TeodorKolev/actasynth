@@ -13,6 +13,12 @@ from tenacity import (
     retry_if_exception_type,
 )
 
+from app.agents.json_parser import extract_json_from_response
+from app.agents.response_validator import (
+    validate_extracted_data,
+    validate_self_check,
+    validate_value_prop,
+)
 from app.schemas.value_proposition import (
     RawInput,
     NormalizedInput,
@@ -164,8 +170,10 @@ Extract problem, solution, pain points, value drivers, stakeholders, timeline, a
         schema = self._get_extraction_schema()
         response = await self._call_with_retry(prompt, EXTRACT_SYSTEM_PROMPT, json_schema=schema)
 
-        # Parse JSON response
-        extracted_dict = json.loads(response.content)
+        # Parse JSON response using robust parser
+        extracted_dict = extract_json_from_response(response.content)
+        # Validate and sanitize to ensure schema compliance
+        extracted_dict = validate_extracted_data(extracted_dict)
         extracted = ExtractedData(**extracted_dict)
 
         metrics = ProviderMetrics(
@@ -204,8 +212,10 @@ Check each claim for accuracy and identify any potential hallucinations."""
         schema = self._get_self_check_schema()
         response = await self._call_with_retry(prompt, SELF_CHECK_SYSTEM_PROMPT, json_schema=schema)
 
-        # Parse response
-        self_check_dict = json.loads(response.content)
+        # Parse response using robust parser
+        self_check_dict = extract_json_from_response(response.content)
+        # Validate and sanitize to ensure schema compliance
+        self_check_dict = validate_self_check(self_check_dict)
         self_check = SelfCheckResult(**self_check_dict)
 
         metrics = ProviderMetrics(
@@ -240,8 +250,10 @@ Target persona: Executive (focus on ROI and business impact)"""
         schema = self._get_value_prop_schema()
         response = await self._call_with_retry(prompt, REWRITE_SYSTEM_PROMPT, json_schema=schema)
 
-        # Parse response
-        value_prop_dict = json.loads(response.content)
+        # Parse response using robust parser
+        value_prop_dict = extract_json_from_response(response.content)
+        # Validate and sanitize to ensure schema compliance
+        value_prop_dict = validate_value_prop(value_prop_dict)
         value_prop = ValueProposition(**value_prop_dict)
 
         metrics = ProviderMetrics(
@@ -362,12 +374,16 @@ Target persona: Executive (focus on ROI and business impact)"""
         return WorkflowResult(
             run_id=run_id,
             value_proposition=ValueProposition(
-                headline="Error",
-                problem="",
-                solution="",
-                differentiation="",
-                call_to_action="",
-                key_talking_points=["Error occurred"],
+                headline="Workflow execution failed",
+                problem="An error occurred during workflow execution",
+                solution="Please check logs and try again",
+                differentiation="N/A",
+                call_to_action="Review error message and retry",
+                key_talking_points=[
+                    "Workflow execution encountered an error",
+                    "Check API keys and configuration",
+                    "Review logs for detailed error information",
+                ],
             ),
             normalized_input=NormalizedInput(
                 content="", language=Language.ENGLISH, cleaned_content="", word_count=0

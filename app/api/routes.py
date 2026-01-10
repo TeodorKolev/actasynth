@@ -1,6 +1,6 @@
 """API route handlers"""
 
-from typing import Dict
+from typing import Dict, Any
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 from fastapi.responses import Response
@@ -25,6 +25,24 @@ async def health_check() -> Dict[str, str]:
         Status message
     """
     return {"status": "healthy", "service": "agentops-studio"}
+
+
+@router.get("/config/check")
+async def config_check() -> Dict[str, Any]:
+    """
+    Check configuration status (for debugging).
+
+    Returns:
+        Configuration status
+    """
+    api_keys = settings.get_api_keys()
+    return {
+        "openai_key_configured": bool(api_keys.get("openai") and len(api_keys["openai"]) > 10),
+        "anthropic_key_configured": bool(api_keys.get("anthropic") and len(api_keys["anthropic"]) > 10),
+        "google_key_configured": bool(api_keys.get("google") and len(api_keys["google"]) > 10),
+        "environment": settings.environment,
+        "langsmith_enabled": settings.langchain_tracing_v2,
+    }
 
 
 @router.get("/metrics")

@@ -1,0 +1,22 @@
+# Minimal Dockerfile - uses python base image with build tools
+FROM python:3.11
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+WORKDIR /app
+
+# Copy and install dependencies
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY app ./app
+COPY gunicorn.conf.py ./
+
+# Expose port
+EXPOSE 8000
+
+# Run with Gunicorn
+CMD ["gunicorn", "app.main:app", "-c", "gunicorn.conf.py", "--bind", "0.0.0.0:8000"]

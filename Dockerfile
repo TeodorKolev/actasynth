@@ -11,6 +11,7 @@ ENV PYTHONUNBUFFERED=1 \
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     curl \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Poetry
@@ -18,11 +19,11 @@ RUN pip install poetry==1.7.1
 
 # Copy dependency files
 WORKDIR /app
-COPY pyproject.toml poetry.lock* ./
+COPY pyproject.toml ./
 
-# Install dependencies (without dev dependencies)
-RUN poetry config virtualenvs.create false && \
-    poetry install --no-dev --no-interaction --no-ansy
+# Export requirements and install
+RUN poetry export -f requirements.txt --output requirements.txt --without-hashes && \
+    pip install --no-cache-dir -r requirements.txt
 
 # Production stage
 FROM python:3.11-slim
