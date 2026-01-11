@@ -1,13 +1,21 @@
 """FastAPI application entry point"""
 
+import os
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import router
 from app.config import settings
+
+# IMPORTANT: Set LangSmith environment variables BEFORE importing any LangChain modules
+if settings.langchain_tracing_v2 and settings.langchain_api_key:
+    os.environ["LANGCHAIN_TRACING_V2"] = "true"
+    os.environ["LANGCHAIN_API_KEY"] = settings.langchain_api_key
+    os.environ["LANGCHAIN_PROJECT"] = settings.langchain_project
+
+from app.api.routes import router
 from app.observability.logger import configure_logging, get_logger
 
 # Configure logging
@@ -40,13 +48,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         )
         logger.info("sentry_initialized")
 
-    # Set up LangSmith tracing
+    # LangSmith tracing already configured at module import time
     if settings.langchain_tracing_v2 and settings.langchain_api_key:
-        import os
-
-        os.environ["LANGCHAIN_TRACING_V2"] = "true"
-        os.environ["LANGCHAIN_API_KEY"] = settings.langchain_api_key
-        os.environ["LANGCHAIN_PROJECT"] = settings.langchain_project
         logger.info("langsmith_tracing_enabled", project=settings.langchain_project)
 
     yield

@@ -1,8 +1,10 @@
 """Anthropic Claude provider implementation"""
 
+import json
 import time
 from typing import Any, Optional
-from anthropic import AsyncAnthropic
+from langchain_anthropic import ChatAnthropic
+from langchain_core.messages import HumanMessage, SystemMessage
 from app.providers.base import BaseProvider, ProviderResponse
 
 
@@ -20,7 +22,12 @@ class AnthropicProvider(BaseProvider):
 
     def __init__(self, api_key: str, model: str, temperature: float = 0.7, max_tokens: int = 2000):
         super().__init__(api_key, model, temperature, max_tokens)
-        self.client = AsyncAnthropic(api_key=api_key)
+        self.client = ChatAnthropic(
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            anthropic_api_key=api_key,
+        )
 
     async def generate(
         self,
@@ -28,48 +35,52 @@ class AnthropicProvider(BaseProvider):
         system_prompt: Optional[str] = None,
         json_schema: Optional[dict[str, Any]] = None,
     ) -> ProviderResponse:
-        """Generate response using Anthropic API"""
+        """Generate response using Anthropic API via LangChain (with LangSmith tracing)"""
         start_time = time.perf_counter()
 
-        kwargs: dict[str, Any] = {
-            "model": self.model,
-            "max_tokens": self.max_tokens,
-            "temperature": self.temperature,
-            "messages": [{"role": "user", "content": prompt}],
-        }
-
+        # Build messages - Anthropic in LangChain handles system prompts differently
+        messages = []
         if system_prompt:
-            kwargs["system"] = system_prompt
+            messages.append(SystemMessage(content=system_prompt))
+        messages.append(HumanMessage(content=prompt))
 
-        # Anthropic uses tools for structured output
+        # Configure structured output if schema provided
+        # For LangChain 0.1.0, we'll add schema to prompt instead of using bind_tools
         if json_schema:
-            kwargs["tools"] = [
-                {
-                    "name": "extract_structured_data",
-                    "description": "Extract data according to the specified schema",
-                    "input_schema": json_schema,
-                }
-            ]
-            kwargs["tool_choice"] = {"type": "tool", "name": "extract_structured_data"}
-
-        response = await self.client.messages.create(**kwargs)
+            # Add schema instruction to the user message
+            schema_instruction = f"\n\nRespond with valid JSON matching this schema:\n{json.dumps(json_schema, indent=2)}"
+            if messages:
+                # Append to the last human message
+                last_msg = messages[-1]
+                if isinstance(last_msg, HumanMessage):
+                    messages[-1] = HumanMessage(content=last_msg.content + schema_instruction)
+            response = await self.client.ainvoke(messages)
+        else:
+            response = await self.client.ainvoke(messages)
 
         latency_ms = int((time.perf_counter() - start_time) * 1000)
 
-        # Extract content from response
-        # Anthropic returns tool use in content blocks
+        # Safely extract content
         content = ""
-        for block in response.content:
-            if block.type == "text":
-                content += block.text
-            elif block.type == "tool_use" and json_schema:
-                # Tool use returns structured data
-                import json
+        if hasattr(response, "content"):
+            content = response.content or ""
+        elif isinstance(response, str):
+            content = response
 
-                content = json.dumps(block.input)
+        # Extract token usage from response metadata with safe access
+        tokens_input = 0
+        tokens_output = 0
+        finish_reason = "end_turn"
+        raw_response = None
 
-        tokens_input = response.usage.input_tokens
-        tokens_output = response.usage.output_tokens
+        if hasattr(response, "response_metadata"):
+            metadata = response.response_metadata
+            raw_response = metadata
+
+            usage = metadata.get("usage", {})
+            tokens_input = usage.get("input_tokens", 0)
+            tokens_output = usage.get("output_tokens", 0)
+            finish_reason = metadata.get("stop_reason", "end_turn")
 
         return ProviderResponse(
             content=content,
@@ -78,8 +89,8 @@ class AnthropicProvider(BaseProvider):
             latency_ms=latency_ms,
             cost_usd=self.calculate_cost(tokens_input, tokens_output),
             model=self.model,
-            finish_reason=response.stop_reason or "end_turn",
-            raw_response={"id": response.id, "stop_reason": response.stop_reason},
+            finish_reason=finish_reason,
+            raw_response=raw_response,
         )
 
     def calculate_cost(self, tokens_input: int, tokens_output: int) -> float:

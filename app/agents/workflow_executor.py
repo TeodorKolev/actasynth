@@ -131,10 +131,10 @@ Source: {raw_input.source}
 
 Detect language, identify PII, and provide a cleaned version."""
 
-        response = await self._call_with_retry(prompt, INGEST_SYSTEM_PROMPT)
+        schema = self._get_ingest_schema()
+        response = await self._call_with_retry(prompt, INGEST_SYSTEM_PROMPT, json_schema=schema)
 
-        # Parse response (simplified - in production use JSON schema)
-        # For demo purposes, we'll do basic detection
+        # Parse response using JSON parser
         normalized = self._parse_ingest_response(raw_input.content, response.content)
 
         metrics = ProviderMetrics(
@@ -272,8 +272,8 @@ Target persona: Executive (focus on ROI and business impact)"""
         return value_prop
 
     @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=1, max=10),
+        stop=stop_after_attempt(2),
+        wait=wait_exponential(multiplier=2, min=4, max=30),
         retry=retry_if_exception_type(Exception),
     )
     async def _call_with_retry(
@@ -283,17 +283,44 @@ Target persona: Executive (focus on ROI and business impact)"""
         return await self.provider.generate(prompt, system_prompt, json_schema)
 
     def _parse_ingest_response(self, original: str, response: str) -> NormalizedInput:
-        """Parse ingest response (simplified for demo)"""
-        # In production, this would use proper JSON parsing
-        # For now, return a basic normalized version
-        return NormalizedInput(
-            content=original,
-            language=Language.ENGLISH,
-            detected_pii=[],
-            has_pii=False,
-            cleaned_content=original,
-            word_count=len(original.split()),
-        )
+        """Parse ingest response from JSON"""
+        try:
+            # Parse JSON response
+            data = extract_json_from_response(response)
+
+            # Map response fields to NormalizedInput
+            return NormalizedInput(
+                content=original,
+                language=Language(data.get("language", "en")),
+                detected_pii=[],  # TODO: Parse PII from response
+                has_pii=data.get("pii_detected", False),
+                cleaned_content=data.get("redacted_text", original),
+                word_count=data.get("word_count", len(original.split())),
+            )
+        except Exception as e:
+            # Fallback to basic normalized version if parsing fails
+            return NormalizedInput(
+                content=original,
+                language=Language.ENGLISH,
+                detected_pii=[],
+                has_pii=False,
+                cleaned_content=original,
+                word_count=len(original.split()),
+            )
+
+    def _get_ingest_schema(self) -> dict[str, Any]:
+        """Get JSON schema for ingest"""
+        return {
+            "type": "object",
+            "required": ["language", "pii_detected", "redacted_text", "word_count"],
+            "properties": {
+                "language": {"type": "string", "enum": ["en", "es", "fr", "de", "zh", "ja", "other"]},
+                "pii_detected": {"type": "boolean"},
+                "redacted_text": {"type": "string"},
+                "word_count": {"type": "integer"},
+                "input_quality": {"type": "string", "enum": ["good", "fair", "poor"]},
+            },
+        }
 
     def _get_extraction_schema(self) -> dict[str, Any]:
         """Get JSON schema for extraction"""

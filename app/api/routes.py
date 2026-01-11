@@ -61,7 +61,7 @@ async def metrics() -> Response:
 async def execute_workflow(
     raw_input: RawInput,
     provider: Provider = Provider.OPENAI,
-    model: str = "gpt-4-turbo-preview",
+    model: str = "gpt-4o-mini",
     temperature: float = 0.7,
 ) -> WorkflowResult:
     """
@@ -151,7 +151,7 @@ async def execute_workflow_parallel(
 
     # Default models for each provider
     provider_models = {
-        Provider.OPENAI: "gpt-4-turbo-preview",
+        Provider.OPENAI: "gpt-4o-mini",
         Provider.ANTHROPIC: "claude-3-sonnet-20240229",
         Provider.GOOGLE: "gemini-pro",
     }
