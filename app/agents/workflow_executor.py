@@ -309,7 +309,9 @@ Target persona: Executive (focus on ROI and business impact)"""
             )
 
     def _get_ingest_schema(self) -> dict[str, Any]:
-        """Get JSON schema for ingest"""
+        """Get JSON schema for ingest - custom schema for LLM response format"""
+        # Note: This schema describes the LLM's response format, which differs
+        # from NormalizedInput (the final parsed result)
         return {
             "type": "object",
             "required": ["language", "pii_detected", "redacted_text", "word_count"],
@@ -323,76 +325,77 @@ Target persona: Executive (focus on ROI and business impact)"""
         }
 
     def _get_extraction_schema(self) -> dict[str, Any]:
-        """Get JSON schema for extraction"""
-        return {
-            "type": "object",
-            "required": ["problem_statement", "desired_outcome", "pain_points", "value_drivers"],
-            "properties": {
-                "problem_statement": {"type": "string"},
-                "current_solution": {"type": ["string", "null"]},
-                "desired_outcome": {"type": "string"},
-                "pain_points": {"type": "array", "items": {"type": "string"}},
-                "value_drivers": {"type": "array", "items": {"type": "string"}},
-                "stakeholders": {"type": "array", "items": {"type": "string"}},
-                "timeline": {"type": ["string", "null"]},
-                "budget_signals": {"type": ["string", "null"]},
-                "confidence_score": {"type": "number", "minimum": 0, "maximum": 1},
-            },
-        }
+        """Get JSON schema for extraction - auto-generated from Pydantic model"""
+        # Auto-generate from ExtractedData Pydantic model
+        schema = ExtractedData.model_json_schema()
+
+        # Remove JSON schema metadata that LLMs don't need
+        schema.pop("title", None)
+        schema.pop("description", None)
+
+        return schema
 
     def _get_self_check_schema(self) -> dict[str, Any]:
-        """Get JSON schema for self-check"""
-        return {
-            "type": "object",
-            "required": ["verifications", "overall_accuracy", "hallucination_risk", "approved"],
-            "properties": {
-                "verifications": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "claim": {"type": "string"},
-                            "supported_by_input": {"type": "boolean"},
-                            "evidence": {"type": ["string", "null"]},
-                            "confidence": {"type": "number"},
-                        },
-                    },
-                },
-                "overall_accuracy": {"type": "number"},
-                "hallucination_risk": {"type": "number"},
-                "approved": {"type": "boolean"},
-                "rejection_reason": {"type": ["string", "null"]},
-            },
-        }
+        """Get JSON schema for self-check - auto-generated from Pydantic model"""
+        # Auto-generate from SelfCheckResult Pydantic model
+        schema = SelfCheckResult.model_json_schema()
+
+        # Remove JSON schema metadata that LLMs don't need
+        schema.pop("title", None)
+        schema.pop("description", None)
+
+        # Inline $defs to resolve $ref references (LLMs don't understand $ref well)
+        if "$defs" in schema and "verifications" in schema.get("properties", {}):
+            # Replace $ref with actual ClaimVerification schema
+            if "$ref" in schema["properties"]["verifications"].get("items", {}):
+                claim_verification_schema = schema["$defs"]["ClaimVerification"]
+                # Remove title/description from nested schema
+                claim_verification_schema.pop("title", None)
+                claim_verification_schema.pop("description", None)
+                # Inline the schema
+                schema["properties"]["verifications"]["items"] = claim_verification_schema
+
+        # Remove $defs after inlining
+        schema.pop("$defs", None)
+
+        return schema
 
     def _get_value_prop_schema(self) -> dict[str, Any]:
-        """Get JSON schema for value proposition"""
-        return {
-            "type": "object",
-            "required": [
-                "headline",
-                "problem",
-                "solution",
-                "differentiation",
-                "call_to_action",
-                "key_talking_points",
-            ],
-            "properties": {
-                "headline": {"type": "string", "maxLength": 200},
-                "problem": {"type": "string"},
-                "solution": {"type": "string"},
-                "differentiation": {"type": "string"},
-                "quantified_value": {"type": ["string", "null"]},
-                "call_to_action": {"type": "string"},
-                "persona": {"type": "string", "enum": ["executive", "technical", "business_user"]},
-                "key_talking_points": {
-                    "type": "array",
-                    "items": {"type": "string"},
-                    "minItems": 3,
-                    "maxItems": 5,
-                },
-            },
-        }
+        """Get JSON schema for value proposition - auto-generated from Pydantic model"""
+        # Auto-generate from ValueProposition Pydantic model
+        schema = ValueProposition.model_json_schema()
+
+        # Remove JSON schema metadata that LLMs don't need
+        schema.pop("title", None)
+        schema.pop("description", None)
+
+        # Inline $defs to resolve $ref references (for Persona enum)
+        if "$defs" in schema and "persona" in schema.get("properties", {}):
+            # Replace $ref with actual Persona enum schema
+            if "$ref" in schema["properties"]["persona"]:
+                persona_schema = schema["$defs"]["Persona"]
+                # Merge persona schema into the property, keeping default and description
+                default = schema["properties"]["persona"].get("default")
+                description = schema["properties"]["persona"].get("description")
+                schema["properties"]["persona"] = {
+                    "type": "string",
+                    "enum": persona_schema.get("enum", []),
+                }
+                if default:
+                    schema["properties"]["persona"]["default"] = default
+                if description:
+                    schema["properties"]["persona"]["description"] = description
+
+        # Remove $defs after inlining
+        schema.pop("$defs", None)
+
+        # Remove auto-generated fields that LLM shouldn't set
+        if "properties" in schema and "generated_at" in schema["properties"]:
+            schema["properties"].pop("generated_at")
+            if "required" in schema and "generated_at" in schema["required"]:
+                schema["required"].remove("generated_at")
+
+        return schema
 
     def _build_error_result(
         self, run_id: str, workflow_run: WorkflowRun, error: str
