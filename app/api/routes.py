@@ -60,8 +60,8 @@ async def metrics() -> Response:
 @track_workflow_execution
 async def execute_workflow(
     raw_input: RawInput,
-    provider: Provider = Provider.OPENAI,
-    model: str = "gpt-4o-mini",
+    provider: Provider = Provider.GOOGLE,
+    model: str = "gemini-2.5-flash-lite",
     temperature: float = 0.7,
 ) -> WorkflowResult:
     """
@@ -151,9 +151,9 @@ async def execute_workflow_parallel(
 
     # Default models for each provider
     provider_models = {
-        Provider.OPENAI: "gpt-4o-mini",
-        Provider.ANTHROPIC: "claude-3-sonnet-20240229",
-        Provider.GOOGLE: "gemini-pro",
+        Provider.OPENAI: "gpt-5-mini",
+        Provider.ANTHROPIC: "claude-sonnet-4-5",
+        Provider.GOOGLE: "gemini-2.5-flash-lite",
     }
 
     async def run_provider(provider: Provider) -> tuple[str, WorkflowResult]:

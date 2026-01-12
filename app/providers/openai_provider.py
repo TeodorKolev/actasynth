@@ -11,14 +11,7 @@ from app.providers.base import BaseProvider, ProviderResponse
 
 # Pricing per 1M tokens (as of Jan 2025)
 OPENAI_PRICING = {
-    "gpt-4-turbo": {"input": 10.0, "output": 30.0},
-    "gpt-4-turbo-preview": {"input": 10.0, "output": 30.0},
-    "gpt-4-1106-preview": {"input": 10.0, "output": 30.0},
-    "gpt-4o": {"input": 2.5, "output": 10.0},
-    "gpt-4o-mini": {"input": 0.15, "output": 0.6},
-    "gpt-4": {"input": 30.0, "output": 60.0},
-    "gpt-3.5-turbo": {"input": 0.5, "output": 1.5},
-    "gpt-3.5-turbo-1106": {"input": 1.0, "output": 2.0},
+    "gpt-5-mini": {"input": 0.10, "output": 0.40},  # Estimated pricing for GPT-5 Mini
 }
 
 

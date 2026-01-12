@@ -10,10 +10,7 @@ from app.providers.base import BaseProvider, ProviderResponse
 
 # Pricing per 1M tokens (as of Jan 2025)
 ANTHROPIC_PRICING = {
-    "claude-3-opus-20240229": {"input": 15.0, "output": 75.0},
-    "claude-3-sonnet-20240229": {"input": 3.0, "output": 15.0},
-    "claude-3-haiku-20240307": {"input": 0.25, "output": 1.25},
-    "claude-2.1": {"input": 8.0, "output": 24.0},
+    "claude-sonnet-4-5": {"input": 3.0, "output": 15.0},
 }
 
 
