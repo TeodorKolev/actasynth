@@ -121,19 +121,6 @@ curl -X POST "http://localhost:8000/api/v1/workflow/execute?provider=google&mode
   -d '{ ... }'
 ```
 
-### Parallel Provider Execution
-
-Race multiple providers to compare latency and cost:
-
-```bash
-curl -X POST "http://localhost:8000/api/v1/workflow/execute-parallel" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "content": "Your sales notes here...",
-    "providers": ["openai", "anthropic", "google"]
-  }'
-```
-
 ## Explore the System
 
 ### 1. API Documentation

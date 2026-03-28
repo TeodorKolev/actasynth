@@ -177,7 +177,7 @@ app/
 ├── providers/              # OpenAI, Anthropic, Google abstractions
 ├── prompts/                # System prompts per agent step
 ├── schemas/                # Pydantic models for validation
-├── workflows/              # Caching and database
+├── workflows/              # Redis caching
 ├── observability/          # Metrics, logging, tracing
 ├── config.py              # Settings management
 └── main.py                # FastAPI application
@@ -209,16 +209,6 @@ curl -X POST "http://localhost:8000/api/v1/workflow/execute?provider=anthropic" 
   -d '{ ... }'
 ```
 
-### Parallel Provider Comparison
-```bash
-curl -X POST "http://localhost:8000/api/v1/workflow/execute-parallel" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "content": "...",
-    "providers": ["openai", "anthropic", "google"]
-  }'
-```
-
 ### Check Metrics
 ```bash
 curl http://localhost:8000/api/v1/metrics
@@ -228,10 +218,10 @@ curl http://localhost:8000/api/v1/metrics
 
 ## Key Metrics
 
-**Per-Workflow Costs:**
-- OpenAI GPT-4 Turbo: ~$0.004-0.008
-- Anthropic Claude Sonnet: ~$0.002-0.005
-- Google Gemini Pro: ~$0.001-0.003
+**Per-Workflow Costs (4 LLM calls per run):**
+- OpenAI GPT-4o-mini: ~$0.001-0.003
+- Anthropic Claude Sonnet: ~$0.05-0.10
+- Google Gemini Flash Lite: ~$0.001-0.002
 
 **Performance:**
 - Average latency: 2-5 seconds (4 LLM calls)

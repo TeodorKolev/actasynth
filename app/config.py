@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     sentry_dsn: Optional[str] = Field(None, validation_alias="SENTRY_DSN")
     environment: str = Field(default="development", validation_alias="ENVIRONMENT")
 
+    # CORS
+    allowed_origins: list[str] = Field(default=["*"], validation_alias="ALLOWED_ORIGINS")
+
     # Service
     host: str = Field(default="0.0.0.0", validation_alias="HOST")
     port: int = Field(default=8000, validation_alias="PORT")

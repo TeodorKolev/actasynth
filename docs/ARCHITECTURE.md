@@ -267,21 +267,6 @@ async def execute_workflow():
 # Uvicorn worker can handle N concurrent workflows
 ```
 
-### Parallel Provider Execution
-
-```python
-# Race multiple providers to find fastest/cheapest
-async def execute_parallel():
-    tasks = [
-        execute_with_provider(Provider.OPENAI),
-        execute_with_provider(Provider.ANTHROPIC),
-        execute_with_provider(Provider.GOOGLE),
-    ]
-    # All run concurrently
-    results = await asyncio.gather(*tasks)
-    return results
-```
-
 ## Scaling Considerations
 
 ### Horizontal Scaling

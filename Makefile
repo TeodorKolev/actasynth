@@ -35,7 +35,7 @@ run:
 	poetry run python -m app.main
 
 docker-build:
-	docker build -t agentops-studio:latest .
+	docker build -f Dockerfile.simple -t agentops-studio:latest .
 
 docker-up:
 	docker-compose up -d

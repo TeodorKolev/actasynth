@@ -24,22 +24,10 @@ class ModelConfig(BaseModel):
     timeout_seconds: int = Field(default=30, gt=0)
 
 
-class RetryConfig(BaseModel):
-    """Retry and fallback configuration"""
-
-    max_retries: int = Field(default=3, ge=0, le=10)
-    initial_delay_seconds: float = Field(default=1.0, gt=0)
-    max_delay_seconds: float = Field(default=60.0, gt=0)
-    exponential_base: float = Field(default=2.0, gt=1)
-    enable_fallback: bool = True
-    fallback_providers: list[Provider] = Field(default_factory=list)
-
-
 class WorkflowConfig(BaseModel):
     """Configuration for a complete workflow run"""
 
     primary_model: ModelConfig
-    retry_config: RetryConfig = Field(default_factory=RetryConfig)
     enable_caching: bool = True
     enable_tracing: bool = True
     cache_ttl_seconds: int = Field(default=3600, gt=0)

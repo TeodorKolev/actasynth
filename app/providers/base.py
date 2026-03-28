@@ -21,11 +21,12 @@ class ProviderResponse(BaseModel):
 class BaseProvider(ABC):
     """Abstract base class for LLM providers"""
 
-    def __init__(self, api_key: str, model: str, temperature: float = 0.7, max_tokens: int = 2000):
+    def __init__(self, api_key: str, model: str, temperature: float = 0.7, max_tokens: int = 2000, timeout_seconds: int = 30):
         self.api_key = api_key
         self.model = model
         self.temperature = temperature
         self.max_tokens = max_tokens
+        self.timeout_seconds = timeout_seconds
 
     @abstractmethod
     async def generate(

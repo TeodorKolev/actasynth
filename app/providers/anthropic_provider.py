@@ -17,13 +17,14 @@ ANTHROPIC_PRICING = {
 class AnthropicProvider(BaseProvider):
     """Anthropic Claude provider with tool calling support"""
 
-    def __init__(self, api_key: str, model: str, temperature: float = 0.7, max_tokens: int = 2000):
-        super().__init__(api_key, model, temperature, max_tokens)
+    def __init__(self, api_key: str, model: str, temperature: float = 0.7, max_tokens: int = 2000, timeout_seconds: int = 30):
+        super().__init__(api_key, model, temperature, max_tokens, timeout_seconds)
         self.client = ChatAnthropic(
             model=model,
             temperature=temperature,
             max_tokens=max_tokens,
             anthropic_api_key=api_key,
+            default_request_timeout=timeout_seconds,
         )
 
     async def generate(

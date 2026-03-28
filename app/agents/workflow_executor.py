@@ -10,10 +10,13 @@ from tenacity import (
     retry,
     stop_after_attempt,
     wait_exponential,
-    retry_if_exception_type,
+    retry_if_not_exception_type,
 )
 
 from app.agents.json_parser import extract_json_from_response
+from app.observability.logger import get_logger
+
+logger = get_logger(__name__)
 from app.agents.response_validator import (
     validate_extracted_data,
     validate_self_check,
@@ -274,7 +277,7 @@ Target persona: Executive (focus on ROI and business impact)"""
     @retry(
         stop=stop_after_attempt(2),
         wait=wait_exponential(multiplier=2, min=4, max=30),
-        retry=retry_if_exception_type(Exception),
+        retry=retry_if_not_exception_type((ValueError, TypeError, KeyError)),
     )
     async def _call_with_retry(
         self, prompt: str, system_prompt: str, json_schema: dict[str, Any] | None = None
@@ -292,13 +295,13 @@ Target persona: Executive (focus on ROI and business impact)"""
             return NormalizedInput(
                 content=original,
                 language=Language(data.get("language", "en")),
-                detected_pii=[],  # TODO: Parse PII from response
+                detected_pii=[],
                 has_pii=data.get("pii_detected", False),
                 cleaned_content=data.get("redacted_text", original),
                 word_count=data.get("word_count", len(original.split())),
             )
         except Exception as e:
-            # Fallback to basic normalized version if parsing fails
+            logger.warning("ingest_parse_failed", error=str(e), response_preview=response[:200])
             return NormalizedInput(
                 content=original,
                 language=Language.ENGLISH,
