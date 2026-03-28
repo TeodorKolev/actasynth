@@ -1,7 +1,7 @@
 """API route handlers"""
 
 from typing import Dict, Any
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 from fastapi.responses import Response
 
@@ -11,6 +11,7 @@ from app.agents.workflow_executor import WorkflowExecutor
 from app.config import settings
 from app.observability.logger import get_logger
 from app.observability.metrics import track_workflow_execution, metrics_registry
+from app.workflows.cache import workflow_cache
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -105,11 +106,22 @@ async def execute_workflow(
             provider=provider, model_name=model, temperature=temperature, max_tokens=2000
         )
 
-        config = WorkflowConfig(primary_model=model_config, enable_tracing=True)
+        config = WorkflowConfig(primary_model=model_config)
+
+        # Check cache first
+        if config.enable_caching:
+            cached = await workflow_cache.get(raw_input.content, provider.value, model)
+            if cached:
+                logger.info("workflow_cache_hit", provider=provider.value, model=model)
+                return cached
 
         # Execute workflow
         executor = WorkflowExecutor(config=config, api_keys=settings.get_api_keys())
         result = await executor.execute(raw_input)
+
+        # Store successful result in cache
+        if config.enable_caching and result.success:
+            await workflow_cache.set(raw_input.content, provider.value, model, result)
 
         logger.info(
             "workflow_execution_completed",
@@ -123,93 +135,7 @@ async def execute_workflow(
 
     except Exception as e:
         logger.error("workflow_execution_failed", error=str(e), exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Workflow execution failed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Workflow execution failed. Check server logs for details.")
 
 
-@router.post("/workflow/execute-parallel")
-async def execute_workflow_parallel(
-    raw_input: RawInput,
-    providers: list[Provider] = [Provider.OPENAI, Provider.ANTHROPIC],
-) -> Dict[str, WorkflowResult]:
-    """
-    Execute workflow across multiple providers in parallel and return fastest result.
 
-    This demonstrates async parallel execution - a key production pattern.
-    Fires requests to multiple providers simultaneously and returns the first
-    successful result (or all results for comparison).
-
-    Args:
-        raw_input: Raw customer notes/feedback
-        providers: List of providers to race
-
-    Returns:
-        Dictionary mapping provider name to workflow result
-    """
-    import asyncio
-
-    logger.info("parallel_workflow_started", providers=[p.value for p in providers])
-
-    # Default models for each provider
-    provider_models = {
-        Provider.OPENAI: "gpt-5-mini",
-        Provider.ANTHROPIC: "claude-sonnet-4-5",
-        Provider.GOOGLE: "gemini-2.5-flash-lite",
-    }
-
-    async def run_provider(provider: Provider) -> tuple[str, WorkflowResult]:
-        """Run workflow for a single provider"""
-        try:
-            model_config = ModelConfig(
-                provider=provider,
-                model_name=provider_models[provider],
-                temperature=0.7,
-                max_tokens=2000,
-            )
-            config = WorkflowConfig(primary_model=model_config)
-            executor = WorkflowExecutor(config=config, api_keys=settings.get_api_keys())
-            result = await executor.execute(raw_input)
-            return (provider.value, result)
-        except Exception as e:
-            logger.error("provider_execution_failed", provider=provider.value, error=str(e))
-            raise
-
-    # Execute all providers in parallel
-    tasks = [run_provider(p) for p in providers]
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-
-    # Build response
-    response = {}
-    for result in results:
-        if isinstance(result, Exception):
-            continue
-        provider_name, workflow_result = result
-        response[provider_name] = workflow_result
-
-    logger.info(
-        "parallel_workflow_completed",
-        providers_succeeded=len(response),
-        providers_total=len(providers),
-    )
-
-    if not response:
-        raise HTTPException(status_code=500, detail="All providers failed")
-
-    return response
-
-
-@router.get("/workflow/run/{run_id}")
-async def get_workflow_run(run_id: str) -> Dict[str, str]:
-    """
-    Retrieve a specific workflow run by ID.
-
-    In production, this would query the database.
-    For now, returns a placeholder.
-
-    Args:
-        run_id: Workflow run ID
-
-    Returns:
-        Workflow run details
-    """
-    # TODO: Implement database query
-    return {"run_id": run_id, "status": "not_implemented"}

@@ -1,6 +1,9 @@
 """Validation and sanitization of LLM responses to ensure schema compliance"""
 
 from typing import Any
+from app.observability.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 def validate_extracted_data(data: dict[str, Any]) -> dict[str, Any]:
@@ -11,10 +14,12 @@ def validate_extracted_data(data: dict[str, Any]) -> dict[str, Any]:
     """
     # Ensure pain_points has at least 1 item
     if not data.get("pain_points") or len(data["pain_points"]) == 0:
+        logger.warning("extraction_missing_field", field="pain_points")
         data["pain_points"] = ["Not specified in input"]
 
     # Ensure value_drivers has at least 1 item
     if not data.get("value_drivers") or len(data["value_drivers"]) == 0:
+        logger.warning("extraction_missing_field", field="value_drivers")
         data["value_drivers"] = ["Not specified in input"]
 
     # Ensure stakeholders is a list (even if empty)
@@ -27,9 +32,11 @@ def validate_extracted_data(data: dict[str, Any]) -> dict[str, Any]:
 
     # Ensure required string fields are not empty
     if not data.get("problem_statement"):
+        logger.warning("extraction_missing_field", field="problem_statement")
         data["problem_statement"] = "Customer problem not clearly specified"
 
     if not data.get("desired_outcome"):
+        logger.warning("extraction_missing_field", field="desired_outcome")
         data["desired_outcome"] = "Desired outcome not specified"
 
     return data
@@ -70,7 +77,7 @@ def validate_value_prop(data: dict[str, Any]) -> dict[str, Any]:
     talking_points = data.get("key_talking_points", [])
 
     if len(talking_points) < 3:
-        # Pad with generic points
+        logger.warning("value_prop_padding_talking_points", count=len(talking_points))
         while len(talking_points) < 3:
             talking_points.append(f"Additional value point {len(talking_points) + 1}")
         data["key_talking_points"] = talking_points
@@ -83,6 +90,7 @@ def validate_value_prop(data: dict[str, Any]) -> dict[str, Any]:
 
     for field in required_fields:
         if not data.get(field) or not data[field].strip():
+            logger.warning("value_prop_missing_field", field=field)
             data[field] = f"{field.replace('_', ' ').title()} not specified"
 
     return data

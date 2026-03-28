@@ -40,4 +40,5 @@ def get_provider(config: ModelConfig, api_keys: dict[str, str]) -> BaseProvider:
         model=config.model_name,
         temperature=config.temperature,
         max_tokens=config.max_tokens,
+        timeout_seconds=config.timeout_seconds,
     )

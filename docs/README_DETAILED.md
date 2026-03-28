@@ -110,8 +110,7 @@ app/
 │   ├── value_proposition.py
 │   └── workflow.py
 ├── workflows/            # Workflow utilities
-│   ├── cache.py         # Redis caching
-│   └── database.py      # Postgres models
+│   └── cache.py         # Redis caching
 ├── observability/        # Logging and metrics
 │   ├── logger.py        # Structured logging
 │   └── metrics.py       # Prometheus metrics
@@ -357,28 +356,6 @@ Execute the 4-step value proposition workflow.
 }
 ```
 
-### `POST /api/v1/workflow/execute-parallel`
-
-Execute workflow across multiple providers in parallel (race mode).
-
-**Use Case:** Demonstrate async parallel execution and provider comparison.
-
-**Request:**
-```json
-{
-  "content": "Customer notes...",
-  "providers": ["openai", "anthropic"]
-}
-```
-
-**Response:**
-```json
-{
-  "openai": { "run_id": "...", "total_latency_ms": 820, ... },
-  "anthropic": { "run_id": "...", "total_latency_ms": 1050, ... }
-}
-```
-
 ### `GET /api/v1/health`
 
 Health check endpoint.
@@ -456,7 +433,6 @@ Pre-configured dashboards show:
 - LLM calls have high latency (0.5-5s)
 - Async allows handling multiple requests concurrently
 - Better resource utilization on multi-core systems
-- Enables parallel provider execution (race mode)
 
 **Trade-off:** Slightly more complex code, but necessary for production scale.
 
@@ -466,9 +442,8 @@ Pre-configured dashboards show:
 
 **Rationale:**
 - Different providers have different APIs (OpenAI uses functions, Anthropic uses tools, Gemini uses prompt-based schemas)
-- Enables easy switching and A/B testing
+- Enables easy switching between providers
 - Insulates application logic from provider changes
-- Allows parallel execution for cost/latency optimization
 
 **Implementation:** Base class with `generate()` method, provider-specific subclasses.
 

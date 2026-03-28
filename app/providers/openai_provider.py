@@ -5,26 +5,27 @@ import time
 from typing import Any, Optional
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_core.output_parsers import JsonOutputParser
 from app.providers.base import BaseProvider, ProviderResponse
 
 
 # Pricing per 1M tokens (as of Jan 2025)
 OPENAI_PRICING = {
-    "gpt-5-mini": {"input": 0.10, "output": 0.40},  # Estimated pricing for GPT-5 Mini
+    "gpt-4o-mini": {"input": 0.15, "output": 0.60},
+    "gpt-4o": {"input": 2.50, "output": 10.00},
 }
 
 
 class OpenAIProvider(BaseProvider):
     """OpenAI provider with function calling and JSON mode support"""
 
-    def __init__(self, api_key: str, model: str, temperature: float = 0.7, max_tokens: int = 2000):
-        super().__init__(api_key, model, temperature, max_tokens)
+    def __init__(self, api_key: str, model: str, temperature: float = 0.7, max_tokens: int = 2000, timeout_seconds: int = 30):
+        super().__init__(api_key, model, temperature, max_tokens, timeout_seconds)
         self.client = ChatOpenAI(
             model=model,
             temperature=temperature,
             max_tokens=max_tokens,
             openai_api_key=api_key,
+            request_timeout=timeout_seconds,
         )
 
     async def generate(
@@ -109,7 +110,7 @@ class OpenAIProvider(BaseProvider):
 
     def calculate_cost(self, tokens_input: int, tokens_output: int) -> float:
         """Calculate cost based on OpenAI pricing"""
-        pricing = OPENAI_PRICING.get(self.model, {"input": 10.0, "output": 30.0})
+        pricing = OPENAI_PRICING.get(self.model, {"input": 2.50, "output": 10.0})
         input_cost = (tokens_input / 1_000_000) * pricing["input"]
         output_cost = (tokens_output / 1_000_000) * pricing["output"]
         return round(input_cost + output_cost, 6)

@@ -6,6 +6,9 @@ from typing import Any, Optional
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from app.providers.base import BaseProvider, ProviderResponse
+from app.observability.logger import get_logger
+
+logger = get_logger(__name__)
 
 
 # Pricing per 1M tokens (as of Jan 2025)
@@ -19,14 +22,15 @@ GOOGLE_PRICING = {
 class GoogleProvider(BaseProvider):
     """Google Gemini provider implementation"""
 
-    def __init__(self, api_key: str, model: str, temperature: float = 0.7, max_tokens: int = 2000):
-        super().__init__(api_key, model, temperature, max_tokens)
+    def __init__(self, api_key: str, model: str, temperature: float = 0.7, max_tokens: int = 2000, timeout_seconds: int = 30):
+        super().__init__(api_key, model, temperature, max_tokens, timeout_seconds)
         self.client = ChatGoogleGenerativeAI(
             model=model,
             temperature=temperature,
             max_output_tokens=max_tokens,
             google_api_key=api_key,
             convert_system_message_to_human=True,  # Gemini doesn't support system messages natively
+            request_timeout=timeout_seconds,
         )
 
     async def generate(
@@ -79,11 +83,13 @@ class GoogleProvider(BaseProvider):
             tokens_output = usage.get("candidates_token_count", 0)
             finish_reason = metadata.get("finish_reason", "stop")
 
-        # Fallback to estimation if not available
+        # Fallback to estimation if not available (cost tracking will be approximate)
         if tokens_input == 0:
             tokens_input = int(len(user_prompt.split()) * 1.3)
+            logger.warning("google_token_count_estimated", field="tokens_input", estimated=tokens_input)
         if tokens_output == 0:
             tokens_output = int(len(content.split()) * 1.3)
+            logger.warning("google_token_count_estimated", field="tokens_output", estimated=tokens_output)
 
         return ProviderResponse(
             content=content,

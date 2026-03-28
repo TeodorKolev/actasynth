@@ -19,6 +19,7 @@ from app.schemas.workflow import (
     AgentStepResult,
     AgentStep,
     StepStatus,
+    ProviderMetrics,
 )
 
 
@@ -151,7 +152,6 @@ class TestWorkflowConfig:
         config = WorkflowConfig(primary_model=model_config)
         assert config.primary_model.provider == Provider.OPENAI
         assert config.enable_caching is True  # default
-        assert config.retry_config.max_retries == 3  # default
 
     def test_temperature_bounds(self):
         """Test temperature must be between 0 and 2"""
@@ -168,8 +168,6 @@ class TestAgentStepResult:
 
     def test_mark_complete(self):
         """Test marking step as complete updates all fields"""
-        from app.schemas.workflow import ProviderMetrics
-
         step = AgentStepResult(
             step=AgentStep.INGEST,
             status=StepStatus.RUNNING,
