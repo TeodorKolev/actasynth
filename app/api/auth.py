@@ -1,4 +1,7 @@
-"""Cognito JWT authentication dependency"""
+"""Cognito JWT authentication and rate limiting dependencies"""
+
+from collections import defaultdict
+from time import time
 
 import httpx
 from fastapi import Depends, HTTPException
@@ -60,3 +63,29 @@ async def verify_cognito_token(
     except Exception as e:
         logger.error("cognito_auth_error", error=str(e))
         raise HTTPException(status_code=401, detail="Authentication failed")
+
+
+_user_request_times: dict[str, list[float]] = defaultdict(list)
+_RATE_LIMIT = 10   # requests per window
+_RATE_WINDOW = 60  # seconds
+
+
+async def rate_limited_user(user: dict = Depends(verify_cognito_token)) -> dict:
+    """Auth + per-user rate limit: 10 requests/minute per Cognito sub.
+
+    Uses in-memory sliding window — resets on Lambda cold start, but
+    combined with API Gateway global throttle this is sufficient for
+    protecting LLM cost without Redis.
+    """
+    user_id = user.get("sub", "anonymous")
+    now = time()
+    cutoff = now - _RATE_WINDOW
+
+    _user_request_times[user_id] = [t for t in _user_request_times[user_id] if t > cutoff]
+
+    if len(_user_request_times[user_id]) >= _RATE_LIMIT:
+        logger.warning("rate_limit_exceeded", user_id=user_id)
+        raise HTTPException(status_code=429, detail="Rate limit exceeded: 10 requests per minute")
+
+    _user_request_times[user_id].append(now)
+    return user
