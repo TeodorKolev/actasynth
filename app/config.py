@@ -10,10 +10,10 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    # API Keys
-    openai_api_key: str = Field(..., validation_alias="OPENAI_API_KEY")
-    anthropic_api_key: str = Field(..., validation_alias="ANTHROPIC_API_KEY")
-    google_api_key: str = Field(..., validation_alias="GOOGLE_API_KEY")
+    # API Keys (Optional — at least one must be set at runtime)
+    openai_api_key: Optional[str] = Field(None, validation_alias="OPENAI_API_KEY")
+    anthropic_api_key: Optional[str] = Field(None, validation_alias="ANTHROPIC_API_KEY")
+    google_api_key: Optional[str] = Field(None, validation_alias="GOOGLE_API_KEY")
 
     # LangSmith
     langchain_tracing_v2: bool = Field(default=True, validation_alias="LANGCHAIN_TRACING_V2")
@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     s3_access_key: Optional[str] = Field(None, validation_alias="S3_ACCESS_KEY")
     s3_secret_key: Optional[str] = Field(None, validation_alias="S3_SECRET_KEY")
 
+    # Cognito Auth
+    cognito_region: Optional[str] = Field(None, validation_alias="COGNITO_REGION")
+    cognito_user_pool_id: Optional[str] = Field(None, validation_alias="COGNITO_USER_POOL_ID")
+    cognito_client_id: Optional[str] = Field(None, validation_alias="COGNITO_CLIENT_ID")
+
     # Observability
     sentry_dsn: Optional[str] = Field(None, validation_alias="SENTRY_DSN")
     environment: str = Field(default="development", validation_alias="ENVIRONMENT")
@@ -49,12 +54,15 @@ class Settings(BaseSettings):
     log_level: str = Field(default="info", validation_alias="LOG_LEVEL")
 
     def get_api_keys(self) -> dict[str, str]:
-        """Get all API keys as a dictionary"""
-        return {
-            "openai": self.openai_api_key,
-            "anthropic": self.anthropic_api_key,
-            "google": self.google_api_key,
-        }
+        """Get configured API keys as a dictionary (only non-None keys included)"""
+        keys = {}
+        if self.openai_api_key:
+            keys["openai"] = self.openai_api_key
+        if self.anthropic_api_key:
+            keys["anthropic"] = self.anthropic_api_key
+        if self.google_api_key:
+            keys["google"] = self.google_api_key
+        return keys
 
 
 # Singleton instance

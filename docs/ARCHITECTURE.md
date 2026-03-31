@@ -313,12 +313,12 @@ async def execute_workflow():
 
 ### Layers
 
-1. **Network**: TLS termination at load balancer
-2. **Authentication**: JWT tokens (to be implemented)
+1. **Network**: TLS via API Gateway
+2. **Authentication**: Cognito JWT on `/workflow/execute` (`app/api/auth.py`)
 3. **Validation**: Pydantic schemas on all inputs
-4. **Secrets**: Environment variables, never in code
+4. **Secrets**: Lambda env vars (encrypted at rest by AWS), never in code
 5. **PII Protection**: Detection + redaction in Ingest agent
-6. **Data Storage**: Encrypted at rest (DB/S3)
+6. **CORS**: Restricted to frontend domain via API Gateway + FastAPI middleware
 
 ### Threat Model
 
@@ -393,7 +393,7 @@ Set alerts at:
 
 ## Deployment Architecture
 
-### Development
+### Local Development
 ```
 docker-compose.yml
 ├── API (1 worker, auto-reload)
@@ -402,39 +402,54 @@ docker-compose.yml
 └── MinIO (local)
 ```
 
-### Production (Kubernetes)
+### Production (AWS Lambda)
+
 ```
-┌────────────────────────────────────────┐
-│              Ingress (TLS)             │
-└──────────────┬─────────────────────────┘
-               │
-        ┌──────┴──────┐
-        │   Service   │
-        └──────┬──────┘
-               │
-     ┌─────────┴─────────┐
-     │                   │
-┌────▼──────┐      ┌────▼──────┐
-│ API Pod 1 │      │ API Pod N │
-│ 4 workers │      │ 4 workers │
-└───────────┘      └───────────┘
-     │                   │
-     └─────────┬─────────┘
-               │
-     ┌─────────┴─────────────────┐
-     │                           │
-┌────▼──────┐              ┌────▼──────┐
-│  Redis    │              │ Postgres  │
-│ (Managed) │              │ (RDS)     │
-└───────────┘              └───────────┘
+Frontend (actasynth.com)
+        │
+        │  HTTPS + Cognito JWT
+        ▼
+API Gateway HTTP API (eu-west-1)
+        │
+        ▼
+AWS Lambda (actasynth-production)
+├── Container image (ECR)
+├── 1024MB memory, 300s timeout
+├── Mangum ASGI adapter
+└── FastAPI app
+        │
+        ▼
+LLM Providers (OpenAI / Anthropic / Google)
+
+Observability:
+└── CloudWatch Logs + Metric Filters
+    ├── WorkflowExecutions (count)
+    ├── WorkflowErrors (count)
+    └── WorkflowCostUSD (value)
 ```
 
-**Key Components:**
-- HPA: Horizontal Pod Autoscaler (target CPU 70%)
-- PDB: Pod Disruption Budget (min 2 pods)
-- ConfigMap: Environment configuration
-- Secret: API keys, credentials
-- PVC: Persistent volume claims
+**Infrastructure managed by Terraform (`terraform/`):**
+- ECR repository (container image registry)
+- Lambda function (container image, 1024MB, 300s)
+- API Gateway HTTP API (replaces Lambda Function URLs — blocked at account level)
+- Cognito User Pool + App Client (eu-west-1, JWT auth)
+- CloudWatch log group (30-day retention) + metric filters
+- IAM execution role
+
+**Auth flow:**
+```
+User → Cognito login → JWT token
+Frontend → API Gateway → Lambda
+                              ↓
+                    app/api/auth.py validates JWT
+                    against Cognito JWKS endpoint
+```
+
+**Notes:**
+- Lambda Function URLs are blocked at the AWS account level — API Gateway HTTP API is used instead
+- No Redis/Postgres in production — cache disabled gracefully when Redis unavailable
+- `tiktoken` and `cryptography` pinned to manylinux wheel versions to avoid Rust compilation in Docker
+- State stored in S3 (`actasynth-terraform-state`, eu-west-1, encrypted)
 
 ---
 

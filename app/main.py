@@ -94,6 +94,11 @@ async def root():
     }
 
 
+# Lambda entry point (used by Dockerfile.lambda CMD)
+from mangum import Mangum
+handler = Mangum(app, lifespan="auto")
+
+
 if __name__ == "__main__":
     import uvicorn
 

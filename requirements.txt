@@ -27,5 +27,13 @@ python-multipart>=0.0.9
 prometheus-client>=0.20.0
 structlog>=24.1.0
 
+# Pin to versions with manylinux pre-built wheels (avoids Rust/gcc build from source)
+tiktoken==0.7.0
+cryptography==42.0.8
+
+# Lambda / Auth
+mangum>=0.17.0
+python-jose[cryptography]>=3.3.0
+
 # Utilities
 tenacity>=8.2.3
