@@ -1,0 +1,16 @@
+# Use Lambda base image for both stages — guarantees glibc compatibility
+# Pre-pinned versions of tiktoken and cryptography have manylinux wheels (no Rust/gcc needed)
+FROM public.ecr.aws/lambda/python:3.11 AS builder
+
+RUN pip install --upgrade pip
+COPY requirements.txt ./
+RUN pip install --no-cache-dir --target /install -r requirements.txt
+
+# Final image
+FROM public.ecr.aws/lambda/python:3.11
+
+COPY --from=builder /install ${LAMBDA_TASK_ROOT}
+COPY app ${LAMBDA_TASK_ROOT}/app
+RUN chmod -R 755 ${LAMBDA_TASK_ROOT}
+
+CMD ["app.main.handler"]

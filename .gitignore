@@ -57,3 +57,10 @@ Thumbs.db
 # Claude Code
 CLAUDE.md
 .claude/
+
+# Terraform — secrets and local state (use S3 backend for shared state)
+terraform/secrets.tfvars
+terraform/.terraform/
+terraform/terraform.tfstate
+terraform/terraform.tfstate.backup
+# NOTE: terraform/.terraform.lock.hcl should be committed (provider version lock)

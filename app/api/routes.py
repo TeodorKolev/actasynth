@@ -1,13 +1,14 @@
 """API route handlers"""
 
 from typing import Dict, Any
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 from fastapi.responses import Response
 
 from app.schemas.value_proposition import RawInput, WorkflowResult
 from app.schemas.workflow import WorkflowConfig, ModelConfig, Provider
 from app.agents.workflow_executor import WorkflowExecutor
+from app.api.auth import verify_cognito_token
 from app.config import settings
 from app.observability.logger import get_logger
 from app.observability.metrics import track_workflow_execution, metrics_registry
@@ -64,6 +65,7 @@ async def execute_workflow(
     provider: Provider = Provider.GOOGLE,
     model: str = "gemini-2.5-flash-lite",
     temperature: float = 0.7,
+    _user: dict = Depends(verify_cognito_token),
 ) -> WorkflowResult:
     """
     Execute the complete 4-step value proposition workflow.
